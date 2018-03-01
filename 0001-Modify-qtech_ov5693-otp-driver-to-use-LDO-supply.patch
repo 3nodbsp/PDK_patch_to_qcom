@@ -1,0 +1,86 @@
+From 31e866c5e518f73d2c71351864b8f07a5133ec13 Mon Sep 17 00:00:00 2001
+From: "tao.liu" <tao.liu@3nod.com.cn>
+Date: Mon, 26 Feb 2018 11:14:13 +0800
+Subject: [PATCH] Modify qtech_ov5693 otp driver to use LDO supply
+
+---
+ .../eeprom/libs/qtech_ov5693/qtech_ov5693_eeprom.h | 28 ++++++++++++++++++++--
+ 1 file changed, 26 insertions(+), 2 deletions(-)
+ mode change 100755 => 100644 LINUX/android/vendor/qcom/proprietary/mm-camera/mm-camera2/media-controller/modules/sensors/eeprom/libs/qtech_ov5693/qtech_ov5693_eeprom.h
+
+diff --git a/LINUX/android/vendor/qcom/proprietary/mm-camera/mm-camera2/media-controller/modules/sensors/eeprom/libs/qtech_ov5693/qtech_ov5693_eeprom.h b/LINUX/android/vendor/qcom/proprietary/mm-camera/mm-camera2/media-controller/modules/sensors/eeprom/libs/qtech_ov5693/qtech_ov5693_eeprom.h
+old mode 100755
+new mode 100644
+index 4082947..deae107
+--- a/LINUX/android/vendor/qcom/proprietary/mm-camera/mm-camera2/media-controller/modules/sensors/eeprom/libs/qtech_ov5693/qtech_ov5693_eeprom.h
++++ b/LINUX/android/vendor/qcom/proprietary/mm-camera/mm-camera2/media-controller/modules/sensors/eeprom/libs/qtech_ov5693/qtech_ov5693_eeprom.h
+@@ -74,12 +74,24 @@ static eeprom_lib_func_t qtech_ov5693_lib_func_ptr = {
+           .delay = 0,
+         },
+         {
++          .seq_type = CAMERA_POW_SEQ_GPIO,
++          .seq_val = CAMERA_GPIO_VANA,
++          .config_val = GPIO_OUT_HIGH,
++          .delay = 1,
++        },
++        {
+           .seq_type = CAMERA_POW_SEQ_VREG,
+           .seq_val = CAMERA_VANA,
+           .config_val = 0,
+           .delay = 0,
+         },
+         {
++          .seq_type = CAMERA_POW_SEQ_GPIO,
++          .seq_val = CAMERA_GPIO_VDIG,
++          .config_val = GPIO_OUT_HIGH,
++          .delay = 1,
++        },
++        {
+           .seq_type = CAMERA_POW_SEQ_VREG,
+           .seq_val = CAMERA_VDIG,
+           .config_val = 0,
+@@ -116,7 +128,7 @@ static eeprom_lib_func_t qtech_ov5693_lib_func_ptr = {
+           .delay = 1,
+         },
+       },
+-      .size = 8,
++      .size = 10,
+       .power_down_setting_a =
+       {
+         {
+@@ -144,19 +156,31 @@ static eeprom_lib_func_t qtech_ov5693_lib_func_ptr = {
+           .delay = 0,
+         },
+         {
++          .seq_type = CAMERA_POW_SEQ_GPIO,
++          .seq_val = CAMERA_GPIO_VDIG,
++          .config_val = GPIO_OUT_LOW,
++          .delay = 1,
++        },
++        {
+           .seq_type = CAMERA_POW_SEQ_VREG,
+           .seq_val = CAMERA_VANA,
+           .config_val = 0,
+           .delay = 0,
+         },
+         {
++          .seq_type = CAMERA_POW_SEQ_GPIO,
++          .seq_val = CAMERA_GPIO_VANA,
++          .config_val = GPIO_OUT_LOW,
++          .delay = 1,
++        },
++        {
+           .seq_type = CAMERA_POW_SEQ_VREG,
+           .seq_val = CAMERA_VIO,
+           .config_val = 0,
+           .delay = 0,
+         },
+       },
+-      .size_down = 6,
++      .size_down = 8,
+     },
+     .i2c_freq_mode = SENSOR_I2C_MODE_STANDARD,
+     .mem_map_array =
+-- 
+1.9.1
+
