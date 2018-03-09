@@ -1,0 +1,186 @@
+From ef23f3a6537d42888664a65d5bd235c555122246 Mon Sep 17 00:00:00 2001
+From: "tao.liu" <tao.liu@3nod.com.cn>
+Date: Fri, 9 Mar 2018 11:41:30 +0800
+Subject: [PATCH] Add code to detect LCD_ID only at LENOVO 1.2 board
+
+---
+ .../qcom/lk/target/msm8953/include/target/board.h  | 39 +++++++++++++++++++
+ .../qcom/lk/target/msm8953/target_display.c        | 45 ++++++++++++++++++++++
+ .../arch/arm/boot/dts/qcom/Makefile                |  1 +
+ .../arm/boot/dts/qcom/apq8053-lite-lenovo-v1.2.dts | 28 ++++++++++++++
+ 4 files changed, 113 insertions(+)
+ create mode 100644 hardware/bsp/bootloader/qcom/lk/target/msm8953/include/target/board.h
+ create mode 100644 hardware/bsp/kernel/qcom/qcom-msm8x53-v3.18/arch/arm/boot/dts/qcom/apq8053-lite-lenovo-v1.2.dts
+
+diff --git a/hardware/bsp/bootloader/qcom/lk/target/msm8953/include/target/board.h b/hardware/bsp/bootloader/qcom/lk/target/msm8953/include/target/board.h
+new file mode 100644
+index 0000000..0de7e6e
+--- /dev/null
++++ b/hardware/bsp/bootloader/qcom/lk/target/msm8953/include/target/board.h
+@@ -0,0 +1,39 @@
++/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are
++ * met:
++ *     * Redistributions of source code must retain the above copyright
++ *       notice, this list of conditions and the following disclaimer.
++ *     * Redistributions in binary form must reproduce the above
++ *       copyright notice, this list of conditions and the following
++ *       disclaimer in the documentation and/or other materials provided
++ *       with the distribution.
++ *     * Neither the name of The Linux Foundation nor the names of its
++ *       contributors may be used to endorse or promote products derived
++ *       from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
++ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
++ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
++ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
++ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ *
++ */
++
++#ifndef __TARGET_BOARD_H
++#define __TARGET_BOARD_H
++
++
++#define LINUX_MACHTYPE_LENOVO_1_0      0x01010020
++#define LINUX_MACHTYPE_LENOVO_1_1      0x01010120
++#define LINUX_MACHTYPE_LENOVO_1_2      0x01010220
++
++#endif
++
+diff --git a/hardware/bsp/bootloader/qcom/lk/target/msm8953/target_display.c b/hardware/bsp/bootloader/qcom/lk/target/msm8953/target_display.c
+index 3c6724e..06d859f 100644
+--- a/hardware/bsp/bootloader/qcom/lk/target/msm8953/target_display.c
++++ b/hardware/bsp/bootloader/qcom/lk/target/msm8953/target_display.c
+@@ -45,6 +45,7 @@
+ #include <platform/gpio.h>
+ #include <platform/iomap.h>
+ #include <target/display.h>
++#include <target/board.h>
+ #include <mipi_dsi_autopll_thulium.h>
+ #include <qtimer.h>
+ #include <platform.h>
+@@ -80,6 +81,13 @@ static struct gpio_pin enable_gpio = {
+   "msmgpio", 12, 3, 1, 0, 1
+ };
+ 
++static struct gpio_pin lcd_id0 = {
++  "msmgpio", 140, 3, 0, 0, 1
++};
++
++static struct gpio_pin lcd_id1 = {
++  "msmgpio", 141, 3, 0, 0, 1
++};
+ 
+ #define VCO_DELAY_USEC 1000
+ #define GPIO_STATE_LOW 0
+@@ -448,6 +456,37 @@ bool target_display_panel_node(char *pbuf, uint16_t buf_size)
+ 	return ret;
+ }
+ 
++char * get_lcd_name(void)
++{
++	uint8_t status0 = 0;
++	uint8_t status1 = 0;
++	char *panel_new_name;
++
++	gpio_tlmm_config(lcd_id0.pin_id, 0,
++		lcd_id0.pin_direction, lcd_id0.pin_pull,
++		lcd_id0.pin_strength,
++		lcd_id0.pin_state);
++
++	gpio_tlmm_config(lcd_id1.pin_id, 0,
++		lcd_id1.pin_direction, lcd_id1.pin_pull,
++		lcd_id1.pin_strength,
++		lcd_id1.pin_state);
++
++	status0 = gpio_status(lcd_id0.pin_id);
++	status1 = gpio_status(lcd_id1.pin_id);
++	dprintf(INFO,"target get lcd_id0 --%d---lcd_id1---%d\n",status0,status1);
++	if(status1 == 1)
++	{
++		panel_new_name = "boent51021_1200p_video:skip";
++	}
++	else
++	{
++		panel_new_name = "innolux_800p_video:skip";
++	}
++	return panel_new_name;
++}
++
++
+ void target_display_init(const char *panel_name)
+ {
+ 	struct oem_panel_data oem;
+@@ -455,7 +494,13 @@ void target_display_init(const char *panel_name)
+ 	uint32_t panel_loop = 0;
+ 	uint32_t platform_subtype = board_hardware_subtype();
+ 	uint32_t hw_id = board_hardware_id();
++	uint32_t target_id = board_target_id();
++	dprintf(INFO, "target_display_init(),target_id=%x.\n", target_id);
+ 
++	if(LINUX_MACHTYPE_LENOVO_1_2 == target_id) {
++            panel_name = get_lcd_name();
++	}
++	dprintf(INFO,"target ---get lcd name --%s\n",panel_name);
+ 	set_panel_cmd_string(panel_name);
+ 	oem = mdss_dsi_get_oem_data();
+ 
+diff --git a/hardware/bsp/kernel/qcom/qcom-msm8x53-v3.18/arch/arm/boot/dts/qcom/Makefile b/hardware/bsp/kernel/qcom/qcom-msm8x53-v3.18/arch/arm/boot/dts/qcom/Makefile
+index 98a6883..cc65937 100644
+--- a/hardware/bsp/kernel/qcom/qcom-msm8x53-v3.18/arch/arm/boot/dts/qcom/Makefile
++++ b/hardware/bsp/kernel/qcom/qcom-msm8x53-v3.18/arch/arm/boot/dts/qcom/Makefile
+@@ -252,6 +252,7 @@ dtb-$(CONFIG_ARCH_MSM8953) += msm8953-mtp.dtb \
+ 	apq8053-lite-dragon-v2.0.dtb \
+ 	apq8053-lite-lenovo-v1.0.dtb \
+ 	apq8053-lite-lenovo-v1.1.dtb \
++        apq8053-lite-lenovo-v1.2.dtb \
+ 	apq8053-lite-harman-v1.0.dtb \
+ 	apq8053-lite-lge-v1.0.dtb \
+ 	apq8053-ext-audio-mtp.dtb \
+diff --git a/hardware/bsp/kernel/qcom/qcom-msm8x53-v3.18/arch/arm/boot/dts/qcom/apq8053-lite-lenovo-v1.2.dts b/hardware/bsp/kernel/qcom/qcom-msm8x53-v3.18/arch/arm/boot/dts/qcom/apq8053-lite-lenovo-v1.2.dts
+new file mode 100644
+index 0000000..7b19439
+--- /dev/null
++++ b/hardware/bsp/kernel/qcom/qcom-msm8x53-v3.18/arch/arm/boot/dts/qcom/apq8053-lite-lenovo-v1.2.dts
+@@ -0,0 +1,28 @@
++/*
++ * Copyright (c) 2017, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/dts-v1/;
++
++#include "apq8053-lite.dtsi"
++#include "apq8053-lite-lenovo-v1.0.dtsi"
++#include "apq8053-lite-lenovo-v1.1.dtsi"
++
++/ {
++	model = "Qualcomm Technologies, Inc. APQ8053 Lite Lenovo v1.2 Board";
++	compatible = "qcom,apq8053-lite-dragonboard", "qcom,apq8053", "qcom,dragonboard";
++	qcom,board-id= <0x01010220 0>;
++};
++
++&blsp2_uart0 {
++	status = "okay";
++};
+-- 
+1.9.1
+
